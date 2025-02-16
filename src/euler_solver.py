@@ -1,7 +1,6 @@
 # src/euler_solver.py
 import numpy as np
 from numba import njit
-from ode_model import ODEModel  # Import the ODEModel class
 
 @njit
 def euler_step(f, y, t, dt):
@@ -14,7 +13,7 @@ class EulerSolver:
     """
     Euler solver for solving an ODE using the Euler method.
     """
-    def __init__(self, model: ODEModel):
+    def __init__(self, model):
         self.model = model
 
     def solve(self):
@@ -25,19 +24,21 @@ class EulerSolver:
         t_values = np.linspace(t0, tf, num_steps)
         y_values = np.empty(num_steps)
         y_values[0] = self.model.y_0
-        # Iteratively compute the solution using Euler's method
+        # Use Euler's method via the jitted euler_step
         for n in range(num_steps - 1):
             y_values[n+1] = euler_step(self.model.f, y_values[n], t_values[n], dt)
         return t_values, y_values
 
-# Example usage:
 if __name__ == '__main__':
     from ode_model import ODEModel
+    from numba import njit
 
-    def decay(y: float, t: float) -> float:
+    @njit
+    def decay(y, t):
         return -y
 
-    model = ODEModel(f=decay, y_0=1.0, t_0=0.0, t_f=5.0, dt=0.1)
+    # Create an ODE model with the jitted decay function
+    model = ODEModel(f=decay, y_0=1.0, t_0=0.0, t_f=2.0, dt=0.01)
     solver = EulerSolver(model)
     t, y = solver.solve()
     print("Final numerical solution:", y[-1])
