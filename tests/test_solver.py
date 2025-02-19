@@ -1,30 +1,41 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 import numpy as np
-from numba import njit
-from ode_model import ODEModel
-from euler_solver import EulerSolver
+import pytest
+from src.ode_model import ODEModel
+from src.euler_solver import EulerSolver
 
-@njit
-def decay(y, t):
+def decay_ode(y: float, t: float) -> float:
     return -y
 
-def exact_exponential(y0, t, k=1.0):
+def logistic_ode(y: float, t: float, r: float = 1.0, K: float = 10.0) -> float:
+    return r * y * (1 - y / K)
+
+def exact_decay(y0: float, t: float, k: float = 1.0) -> float:
     return y0 * np.exp(-k * t)
 
+def exact_logistic(y0: float, t: float, r: float = 1.0, K: float = 10.0) -> float:
+    return K / (1 + ((K - y0) / y0) * np.exp(-r * t))
+
 def test_euler_exponential():
-    y0 = 1.0
-    t0 = 0.0
-    tf = 2.0
-    dt = 0.01
-    model = ODEModel(f=decay, y_0=y0, t_0=t0, t_f=tf, dt=dt)
+    y0, t0, tf, dt = 1.0, 0.0, 1.0, 0.01
+    model = ODEModel(f=decay_ode, y0=y0, t0=t0, tf=tf, dt=dt)
     solver = EulerSolver(model)
     t_values, y_values = solver.solve()
-    exact = exact_exponential(y0, tf)
-    assert abs(y_values[-1] - exact) < 1e-2, "Euler solver error exceeds tolerance."
+    
+    y_exact = exact_decay(y0, tf)
+    y_numeric = y_values[-1]
+    tol = 1e-2
+    assert abs(y_numeric - y_exact) < tol, f"Numerical: {y_numeric}, Exact: {y_exact}"
 
-if __name__ == '__main__':
-    test_euler_exponential()
-    print("Test passed: Euler solver matches the exponential decay exact solution.")
+def test_euler_logistic():
+    y0, t0, tf, dt = 1.0, 0.0, 5.0, 0.01
+    r, K = 1.0, 10.0
+    # Use a lambda function to capture logistic parameters
+    ode_func = lambda y, t: logistic_ode(y, t, r, K)
+    model = ODEModel(f=ode_func, y0=y0, t0=t0, tf=tf, dt=dt)
+    solver = EulerSolver(model)
+    t_values, y_values = solver.solve()
+    
+    y_exact = exact_logistic(y0, tf, r, K)
+    y_numeric = y_values[-1]
+    tol = 0.5
+    assert abs(y_numeric - y_exact) < tol, f"Numerical: {y_numeric}, Exact: {y_exact}"
